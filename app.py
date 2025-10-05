@@ -4,15 +4,19 @@ from bs4 import BeautifulSoup
 from fpdf import FPDF
 import base64
 from io import BytesIO
+import re
 
 app = Flask(__name__)
-app.secret_key = 'your_very_secret_key'  # একটি র‍্যান্ডম কী ব্যবহার করুন
+app.secret_key = 'your_very_secret_and_random_key'  # একটি র‍্যান্ডম কী ব্যবহার করুন
 
 # টার্গেট সরকারি ওয়েবসাইট
 BASE_URL = "https://everify.bdris.gov.bd/"
 
-# একটি সেশন অবজেক্ট তৈরি করা যা কুকি সংরক্ষণ করবে
+# একটি সেশন অবজেক্ট তৈরি করা যা কুকি এবং হেডার সংরক্ষণ করবে
 http_session = requests.Session()
+http_session.headers.update({
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+})
 
 @app.route('/')
 def index():
@@ -21,24 +25,39 @@ def index():
 @app.route('/get-captcha')
 def get_captcha():
     try:
-        # সরকারি সাইটের হোমপেজে গিয়ে সেশন শুরু করা
         response = http_session.get(BASE_URL)
         soup = BeautifulSoup(response.text, 'html.parser')
-
-        # ক্যাপচা ইমেজ ট্যাগ খুঁজে বের করা
-        # **গুরুত্বপূর্ণ:** সরকারি সাইট পরিবর্তন হলে এই 'id' পরিবর্তন হতে পারে
-        captcha_img_tag = soup.find('img', {'id': 'captcha_img'})
-        if not captcha_img_tag:
-            return jsonify({'success': False, 'error': 'Captcha image not found on the target website.'})
-
-        captcha_base64 = captcha_img_tag['src']
         
-        # সেশন কুকি সংরক্ষণ করা
+        # নতুন id ব্যবহার করে ক্যাপচা ইমেজ ট্যাগ খুঁজে বের করা
+        captcha_img_tag = soup.find('img', {'id': 'CaptchaImage'})
+        if not captcha_img_tag:
+            return jsonify({'success': False, 'error': 'Captcha image tag not found on the target website.'})
+        
+        captcha_url = BASE_URL.rstrip('/') + captcha_img_tag['src']
+        
+        # ক্যাপচা ইমেজটি বাইনারি হিসেবে ডাউনলোড করা
+        captcha_image_response = http_session.get(captcha_url)
+        if captcha_image_response.status_code != 200:
+            return jsonify({'success': False, 'error': 'Failed to download captcha image.'})
+
+        # ইমেজকে Base64-এ কনভার্ট করা
+        captcha_base64 = "data:image/png;base64," + base64.b64encode(captcha_image_response.content).decode('utf-8')
+
+        # ভেরিফিকেশন টোকেন এবং অন্যান্য প্রয়োজনীয় ইনপুট খুঁজে বের করা
+        token = soup.find('input', {'name': '__RequestVerificationToken'})
+        captcha_de_text = soup.find('input', {'name': 'CaptchaDeText'})
+
+        if not token or not captcha_de_text:
+            return jsonify({'success': False, 'error': 'Required form fields (token/captcha text) not found.'})
+
+        # সেশনে কুকি এবং টোকেন সংরক্ষণ করা
         session['server_cookies'] = http_session.cookies.get_dict()
+        session['token'] = token['value']
+        session['captcha_de_text'] = captcha_de_text['value']
 
         return jsonify({'success': True, 'captcha': captcha_base64})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({'success': False, 'error': f"An error occurred: {str(e)}"})
 
 @app.route('/verify', methods=['POST'])
 def verify_data():
@@ -48,61 +67,81 @@ def verify_data():
         dob = data.get('dob')
         captcha_text = data.get('captcha')
         
-        # সেশনে থাকা কুকি ব্যবহার করা
+        # সেশন থেকে কুকি এবং টোকেন নেওয়া
         cookies = session.get('server_cookies')
-        if not cookies:
+        token = session.get('token')
+        captcha_de_text = session.get('captcha_de_text')
+
+        if not all([cookies, token, captcha_de_text]):
             return jsonify({'success': False, 'error': 'Session expired. Please refresh the page.'})
 
-        # ফরম সাবমিট করার জন্য ডেটা প্রস্তুত করা
-        # **গুরুত্বপূর্ণ:** এই 'name' গুলো সরকারি সাইটের ফর্ম ফিল্ড অনুযায়ী হতে হবে
+        # সরকারি সাইটের নতুন ফর্ম ফিল্ড অনুযায়ী ডেটা প্রস্তুত করা
         payload = {
-            'brn': brn,
-            'dob': dob,
-            'captcha': captcha_text,
+            '__RequestVerificationToken': token,
+            'UBRN': brn,
+            'BirthDate': dob,
+            'CaptchaDeText': captcha_de_text,
+            'CaptchaInputText': captcha_text
         }
 
         # POST রিকোয়েস্ট পাঠানো
-        response = http_session.post(BASE_URL, data=payload, cookies=cookies)
+        # **গুরুত্বপূর্ণ:** ফর্মের action URL টিও যুক্ত করতে হবে
+        form_action_url = BASE_URL + "UBRNVerification/Search"
+        response = http_session.post(form_action_url, data=payload, cookies=cookies)
+        
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # ফলাফল টেবিল খুঁজে বের করা
-        result_divs = soup.find_all('div', class_='col-md-6')
+        # ফলাফলের জন্য নতুন কনটেইনার বা এলিমেন্ট খুঁজে বের করা
+        # **নোট:** ফলাফলের HTML গঠনও পরিবর্তিত হতে পারে। এটি এখন একটি সাধারণ প্যারাগ্রাফের মধ্যে থাকে।
+        result_paragraphs = soup.find_all('p')
         
-        if not result_divs or len(result_divs) < 2:
-            # যদি কোনো এরর মেসেজ থাকে, সেটা খুঁজে বের করা
-            error_div = soup.find('div', class_='alert-danger')
-            if error_div:
-                return jsonify({'success': False, 'error': error_div.text.strip()})
-            return jsonify({'success': False, 'error': 'Could not find the result. Please check the inputs.'})
-
         result_data = {}
-        for div in result_divs:
-            labels = div.find_all('label')
-            if len(labels) == 2:
-                key = labels[0].text.strip().replace(':', '')
-                value = labels[1].text.strip()
+        found = False
+        for p in result_paragraphs:
+            text = p.get_text(strip=True)
+            if ":" in text:
+                parts = text.split(':', 1)
+                key = parts[0].strip()
+                value = parts[1].strip()
                 result_data[key] = value
-        
-        if not result_data:
-            return jsonify({'success': False, 'error': 'No data found. The information may be incorrect.'})
-            
+                found = True
+
+        if not found:
+            # যদি কোনো এরর মেসেজ থাকে, সেটা খুঁজে বের করা
+            error_p = soup.find('p', class_='text-danger')
+            if error_p and error_p.text.strip():
+                return jsonify({'success': False, 'error': error_p.text.strip()})
+            return jsonify({'success': False, 'error': 'Result not found. Please check the inputs or the website may have changed.'})
+
         return jsonify({'success': True, 'data': result_data})
 
     except Exception as e:
-        return jsonify({'success': False, 'error': f"An unexpected error occurred: {str(e)}"})
+        return jsonify({'success': False, 'error': f"An unexpected error occurred during verification: {str(e)}"})
 
-# PDF তৈরির জন্য Helper Class
+
+# PDF তৈরির জন্য Helper Class (এটি অপরিবর্তিত থাকবে)
 class PDF(FPDF):
     def header(self):
-        self.add_font('kalpurush', '', 'font/kalpurush.ttf', uni=True)
-        self.set_font('kalpurush', '', 15)
-        self.cell(0, 10, 'জন্ম নিবন্ধন তথ্য', 1, 1, 'C')
+        try:
+            self.add_font('kalpurush', '', 'font/kalpurush.ttf', uni=True)
+            self.set_font('kalpurush', '', 15)
+        except RuntimeError:
+            # ফন্ট লোড না হলে ফলব্যাক
+            self.set_font('Arial', 'B', 15)
+        self.cell(0, 10, 'Jonmo Nibondhon Tothyo', 1, 1, 'C')
 
     def chapter_body(self, data):
-        self.set_font('kalpurush', '', 12)
+        try:
+            self.set_font('kalpurush', '', 12)
+        except RuntimeError:
+            self.set_font('Arial', '', 12)
+        
         for key, value in data.items():
-            self.cell(80, 10, f'{key}:', 1, 0)
-            self.cell(110, 10, value, 1, 1)
+            # এনকোডিং সমস্যা এড়ানোর জন্য
+            safe_key = key.encode('latin-1', 'replace').decode('latin-1')
+            safe_value = value.encode('latin-1', 'replace').decode('latin-1')
+            self.cell(80, 10, f'{safe_key}:', 1, 0)
+            self.cell(110, 10, safe_value, 1, 1)
 
 @app.route('/download-pdf', methods=['POST'])
 def download_pdf():
@@ -114,7 +153,7 @@ def download_pdf():
     pdf.add_page()
     pdf.chapter_body(data)
     
-    pdf_output = pdf.output(dest='S').encode('latin1')
+    pdf_output = pdf.output(dest='S').encode('latin-1')
     
     response = make_response(pdf_output)
     response.headers.set('Content-Type', 'application/pdf')
@@ -122,4 +161,4 @@ def download_pdf():
     return response
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)
