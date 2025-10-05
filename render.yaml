@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: network-online-service
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.5
+    buildFilter:
+      paths:
+      - "app.py"
+      - "requirements.txt"
+    systemPackages:
+      - name: google-chrome-stable
+      - name: libglib2.0-0
+      - name: libnss3
+      - name: libgconf-2-4
+      - name: libfontconfig1
