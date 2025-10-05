@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>জন্ম নিবন্ধন যাচাই</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>জন্ম নিবন্ধন তথ্য যাচাই করুন</h1>
+            <p>আপনার জন্ম নিবন্ধন নম্বর ও জন্ম তারিখ দিয়ে তথ্য যাচাই করুন</p>
+        </header>
+        <main>
+            <form id="verify-form">
+                <div class="input-group">
+                    <label for="brn">জন্ম নিবন্ধন নম্বর (১৭ ডিজিট)</label>
+                    <input type="text" id="brn" name="brn" placeholder="উদাহরণ: 19901234567890123" required>
+                </div>
+                <div class="input-group">
+                    <label for="dob">জন্ম তারিখ (বছর-মাস-দিন)</label>
+                    <input type="date" id="dob" name="dob" required>
+                </div>
+                <div class="captcha-group">
+                    <div class="captcha-image-wrapper">
+                        <img id="captcha-image" src="" alt="ক্যাপচা লোড হচ্ছে...">
+                    </div>
+                    <div class="input-group">
+                        <label for="captcha">ক্যাপচা উত্তর দিন</label>
+                        <input type="text" id="captcha" name="captcha" placeholder="উপরের ছবিতে যা দেখছেন" required>
+                    </div>
+                </div>
+                <button type="submit" id="submit-btn">যাচাই করুন</button>
+            </form>
+
+            <div id="loader" class="loader" style="display: none;"></div>
+            
+            <div id="result-container" style="display: none;">
+                <h2>যাচাইকৃত তথ্য</h2>
+                <div id="result-data"></div>
+                <button id="download-pdf-btn">PDF ডাউনলোড করুন</button>
+            </div>
+
+            <div id="error-container" style="display: none;">
+                <p id="error-message"></p>
+            </div>
+        </main>
+        <footer>
+            <p>&copy; 2025 - সর্বস্বত্ব সংরক্ষিত</p>
+        </footer>
+    </div>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>```
+
+---
+
+#### ধাপ ৫: ডিজাইন এবং স্টাইল (`static/style.css`)
+
+এই ফাইলটি আপনার ওয়েবসাইটকে আধুনিক ও প্রফেশনাল দেখাবে।
+
+`static/style.css` ফাইলে নিচের কোডটি পেস্ট করুন:
+
+```css
+@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap');
+
+:root {
+    --primary-color: #007bff;
+    --secondary-color: #6c757d;
+    --background-color: #f4f7f6;
+    --card-background: #ffffff;
+    --text-color: #333;
+    --heading-color: #0056b3;
+    --border-radius: 8px;
+    --box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+body {
+    font-family: 'Hind Siliguri', sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.container {
+    width: 100%;
+    max-width: 700px;
+    background: var(--card-background);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    overflow: hidden;
+}
+
+header {
+    background: var(--primary-color);
+    color: white;
+    padding: 20px;
+    text-align: center;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 1.8rem;
+}
+
+main {
+    padding: 30px;
+}
+
+.input-group {
+    margin-bottom: 20px;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--heading-color);
+}
+
+.input-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: var(--border-radius);
+    box-sizing: border-box;
+    font-size: 1rem;
+}
+
+.captcha-group {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+.captcha-image-wrapper {
+    border: 1px solid #ddd;
+    border-radius: var(--border-radius);
+    padding: 5px;
+}
+#captcha-image {
+    display: block;
+    height: 50px;
+}
+
+button {
+    width: 100%;
+    padding: 15px;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius);
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: var(--heading-color);
+}
+
+.loader {
+    border: 8px solid #f3f3f3;
+    border-top: 8px solid var(--primary-color);
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    animation: spin 1s linear infinite;
+    margin: 30px auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+#result-container {
+    margin-top: 30px;
+    padding: 20px;
+    border: 1px solid #eee;
+    border-radius: var(--border-radius);
+    background: #f9f9f9;
+}
+
+#result-container h2 {
+    text-align: center;
+    color: var(--heading-color);
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 10px;
+    margin-top: 0;
+}
+#result-data table {
+    width: 100%;
+    border-collapse: collapse;
+}
+#result-data td {
+    padding: 10px;
+    border: 1px solid #ddd;
+}
+#result-data td:first-child {
+    font-weight: 600;
+    background-color: #e9ecef;
+    width: 40%;
+}
+#download-pdf-btn {
+    margin-top: 20px;
+    background-color: #28a745;
+}
+#download-pdf-btn:hover {
+    background-color: #218838;
+}
+
+#error-container {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    border-radius: var(--border-radius);
+    text-align: center;
+}
+
+footer {
+    background: #f1f1f1;
+    text-align: center;
+    padding: 15px;
+    font-size: 0.9rem;
+    color: var(--secondary-color);
+}
