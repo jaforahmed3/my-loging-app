@@ -25,7 +25,7 @@ def get_captcha():
     print("'/get-captcha' অনুরোধ শুরু হয়েছে...")
     try:
         print("সরকারি সাইটে সংযোগ করার চেষ্টা চলছে...")
-        response = http_session.get(BASE_URL, timeout=20) # ২০ সেকেন্ড টাইমআউট যোগ করা হলো
+        response = http_session.get(BASE_URL, timeout=20, verify=False) # ২০ সেকেন্ড টাইমআউট যোগ করা হলো
         print(f"সরকারি সাইটে সংযোগের স্ট্যাটাস কোড: {response.status_code}")
 
         if response.status_code != 200:
@@ -105,8 +105,7 @@ def verify_data():
         }
         
         form_action_url = BASE_URL + "UBRNVerification/Search"
-        response = http_session.post(form_action_url, data=payload, cookies=cookies)
-        
+        response = http_session.post(form_action_url, data=payload, cookies=cookies, verify=False)
         soup = BeautifulSoup(response.text, 'html.parser')
         
         result_paragraphs = soup.find_all('p')
