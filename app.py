@@ -27,6 +27,7 @@ def index():
 @app.route('/get-captcha')
 def get_captcha():
     try:
+        # এখানে verify=False যোগ করা হলো
         response = http_session.get(BASE_URL, timeout=20, verify=False)
         
         if response.status_code != 200:
@@ -152,4 +153,4 @@ def download_pdf():
     return response
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000)
