@@ -1,5 +1,7 @@
 Flask
-requests
-beautifulsoup4
 fpdf2
 gunicorn
+selenium
+webdriver-manager
+requests
+beautifulsoup4
