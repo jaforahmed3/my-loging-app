@@ -27,7 +27,7 @@ def get_captcha():
 
         # ক্যাপচা ইমেজ ট্যাগ খুঁজে বের করা
         # **গুরুত্বপূর্ণ:** সরকারি সাইট পরিবর্তন হলে এই 'id' পরিবর্তন হতে পারে
-        captcha_img_tag = soup.find('img', {'id': 'captcha_image'})
+        captcha_img_tag = soup.find('img', {'id': 'captcha_img'})
         if not captcha_img_tag:
             return jsonify({'success': False, 'error': 'Captcha image not found on the target website.'})
 
